@@ -49,7 +49,7 @@ Basic usage is as follows:
 
     >>> import pybmtools as pybm
 
-## Open a bigWig or bigBed file
+## Open a BM or bigBed file
 
 This will work if your working directory is the pybmtools source code directory.
 
@@ -57,7 +57,7 @@ This will work if your working directory is the pybmtools source code directory.
 
 Note that if the file doesn't exist you'll see an error message and `None` will be returned. Be default, all files are opened for reading and not writing. You can alter this by passing a mode containing `w`:
 
-    >>> bw = pybm.open("test/output.bm", "w")
+    >>> bw = pybm.openfile("test/output.bm", "w")
 
 Note that a file opened for writing can't be queried for its intervals or statistics, it can *only* be written to. If you open a file for writing then you will next need to add a header (see the section on this below).
 
@@ -81,7 +81,7 @@ The lengths are stored a the "long" integer type, which is why there's an `L` su
 
 ## Print the header
 
-It's sometimes useful to print a bigWig's header. This is presented here as a python dictionary containing: the version (typically `4`), the number of zoom levels (`nLevels`), the number of bases described (`nBasesCovered`), the minimum value (`minVal`), the maximum value (`maxVal`), the sum of all values (`sumData`), and the sum of all squared values (`sumSquared`). The last two of these are needed for determining the mean and standard deviation.
+It's sometimes useful to print a BM's header. This is presented here as a python dictionary containing: the version (typically `4`), the number of zoom levels (`nLevels`), the number of bases described (`nBasesCovered`), the minimum value (`minVal`), the maximum value (`maxVal`), the sum of all values (`sumData`), and the sum of all squared values (`sumSquared`). The last two of these are needed for determining the mean and standard deviation.
 
     >>> bm.header()
     {'version': 61951, 'nLevels': 1, 'nBasesCovered': 2669, 'minVal': 0, 'maxVal': 1, 'sumData': 128.40874156728387, 'sumSquared': 97.26764956510321}
@@ -121,7 +121,7 @@ While the `stats()` method **can** be used to retrieve the original values for e
     >>> bm.getvalues("chr1", 0, 3)
     [0.10000000149011612, 0.20000000298023224, 0.30000001192092896]
 
-The list produced will always contain one value for every base in the range specified. If a particular base has no associated value in the bigWig file then the returned value will be `nan`.
+The list produced will always contain one value for every base in the range specified. If a particular base has no associated value in the BM file then the returned value will be `nan`.
 
     >>> bm.getvalues("chr1", 0, 4)
     [0.10000000149011612, 0.20000000298023224, 0.30000001192092896, nan]
@@ -146,17 +146,17 @@ If you've opened a file for writing then you'll need to give it a header before 
 
     >>> bm.addHeader([("chr1", 1000000), ("chr2", 1500000)])
 
-bigWig headers are case-sensitive, so `chr1` and `Chr1` are different. Likewise, `1` and `chr1` are not the same, so you can't mix Ensembl and UCSC chromosome names. After adding a header, you can then add entries.
+BM headers are case-sensitive, so `chr1` and `Chr1` are different. Likewise, `1` and `chr1` are not the same, so you can't mix Ensembl and UCSC chromosome names. After adding a header, you can then add entries.
 
-By default, up to 10 "zoom levels" are constructed for bigWig files. You can change this default number with the `maxZooms` optional argument. A common use of this is to create a bigWig file that simply holds intervals and no zoom levels:
+By default, up to 10 "zoom levels" are constructed for BM files. You can change this default number with the `maxZooms` optional argument. A common use of this is to create a BM file that simply holds intervals and no zoom levels:
 
     >>> bm.addHeader([("chr1", 1000000), ("chr2", 1500000)], maxZooms=0)
 
-If you set `maxTooms=0`, please note that IGV and many other tools WILL NOT WORK as they assume that at least one zoom level will be present. You are advised to use the default unless you do not expect the bigWig files to be used by other packages.
+If you set `maxTooms=0`, please note that IGV and many other tools WILL NOT WORK as they assume that at least one zoom level will be present. You are advised to use the default unless you do not expect the BM files to be used by other packages.
 
 ## Adding entries to a BM file
 
-Assuming you've opened a file for writing and added a header, you can then add entries. Note that the entries **must** be added in order, as bigWig files always contain ordered intervals. There are three formats that bigWig files can use internally to store entries. The most commonly observed format is identical to a [bedGraph](https://genome.ucsc.edu/goldenpath/help/bedgraph.html) file:
+Assuming you've opened a file for writing and added a header, you can then add entries. Note that the entries **must** be added in order, as BM files always contain ordered intervals. There are three formats that BM files can use internally to store entries.
 
     chr1	0	100	0.0
     chr1	100	120	1.0
@@ -201,7 +201,7 @@ If `pybm.numpy` is `1`, then pybmtools was compiled with numpy support. This mea
 
 Additionally, `getvalues()` can directly output a numpy vector:
 
-    >>> bm = bm.open("test/outnp.bm")
+    >>> bm = bm.openfile("test/outnp.bm")
     >>> bm.values('1', 0, 10, numpy=True)
     [ 0.74336642  0.74336642  0.74336642  0.74336642  0.74336642         nan
          nan         nan         nan         nan]
