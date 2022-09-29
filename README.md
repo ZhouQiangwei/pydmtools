@@ -11,7 +11,7 @@ Table of Contents
     * [Requirements](#requirements)
   * [Usage](#usage)
     * [Load the extension](#load-the-extension)
-    * [Open a BM file](#open-a-bigwig-or-bigbed-file)
+    * [Open a BM file](#open-a-BM-file)
     * [Determining the file type](#determining-the-file-type)
     * [Access the list of chromosomes and their lengths](#access-the-list-of-chromosomes-and-their-lengths)
     * [Print the header](#print-the-header)
@@ -19,9 +19,9 @@ Table of Contents
       * [A note on statistics and zoom levels](#a-note-on-statistics-and-zoom-levels)
     * [Retrieve values for individual bases in a range](#retrieve-values-for-individual-bases-in-a-range)
     * [Retrieve all intervals in a range](#retrieve-all-intervals-in-a-range)
-    * [Add a header to a BM file](#add-a-header-to-a-bigwig-file)
-    * [Adding entries to a BM file](#adding-entries-to-a-bigwig-file)
-    * [Close a BM file](#close-a-bigwig-or-bigbed-file)
+    * [Add a header to a BM file](#add-a-header-to-a-BM-file)
+    * [Adding entries to a BM file](#adding-entries-to-a-BM-file)
+    * [Close a BM file](#close-a-BM-file)
   * [A note on coordinates](#a-note-on-coordinates)
 
 # Installation
@@ -49,15 +49,15 @@ Basic usage is as follows:
 
     >>> import pybmtools as pybm
 
-## Open a BM or bigBed file
+## Open a BM file
 
 This will work if your working directory is the pybmtools source code directory.
 
-    >>> bw = pybm.openfile("test/test.bm")
+    >>> bm = pybm.openfile("test/test.bm")
 
 Note that if the file doesn't exist you'll see an error message and `None` will be returned. Be default, all files are opened for reading and not writing. You can alter this by passing a mode containing `w`:
 
-    >>> bw = pybm.openfile("test/output.bm", "w")
+    >>> bm = pybm.openfile("test/output.bm", "w")
 
 Note that a file opened for writing can't be queried for its intervals or statistics, it can *only* be written to. If you open a file for writing then you will next need to add a header (see the section on this below).
 
@@ -86,7 +86,6 @@ It's sometimes useful to print a BM's header. This is presented here as a python
     >>> bm.header()
     {'version': 61951, 'nLevels': 1, 'nBasesCovered': 2669, 'minVal': 0, 'maxVal': 1, 'sumData': 128.40874156728387, 'sumSquared': 97.26764956510321}
 
-Note that this is also possible for bigBed files and the same dictionary keys will be present. Entries such as `maxVal`, `sumData`, `minVal`, and `sumSquared` are then largely not meaningful.
 
 ## Compute summary information on a range
 
@@ -209,5 +208,5 @@ Additionally, `getvalues()` can directly output a numpy vector:
     <type 'numpy.ndarray'>
 
 
-# A note on coordinates
-BM files use 1-based coordinates. pybmtools and bmtools are based on [libbigwig](https://github.com/dpryan79/libBigWig) and [pyBigWig](https://github.com/deeptools/pyBigWig)
+# A note on coordinates and library using
+BM files use 1-based coordinates. And pybmtools and bmtools are based on [libbigwig](https://github.com/dpryan79/libBigWig) and [pyBigWig](https://github.com/deeptools/pyBigWig)
