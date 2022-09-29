@@ -249,12 +249,12 @@ class TestRemote():
 class TestLocal():
     def testFoo(self):
         blah = TestRemote()
-        blah.fname = os.path.dirname(pybm.__file__) + "/pybmtest/test.bm"
+        blah.fname = "pybmtest/test.bm"
         blah.testAll()
 
 print("xxxx")
-#tl=TestLocal()
-#tl.testFoo()
+tl=TestLocal()
+tl.testFoo()
 
 class TestNumpy():
     def testNumpy(self):
