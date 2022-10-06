@@ -5,7 +5,7 @@ import subprocess
 import glob
 import sys
 try:
-    from numpy.distutils.misc_util import get_info
+    #from numpy.distutils.misc_util import get_info
     from os.path import dirname
     WITHNUMPY = True
 except:
@@ -45,13 +45,13 @@ for v in foo:
         additional_libs.append(v[2:])
 
 include_dirs = ['libbm', sysconfig.get_config_var("INCLUDEPY")]
-if WITHNUMPY is True:
-    defines.extend([('WITHNUMPY', None), ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
-    extra_info = get_info('npymath')
-    include_dirs.extend(extra_info['include_dirs'])
-    libs.extend(extra_info['libraries'])
-    extra_info['library_dirs'].extend(additional_libs)
-    additional_libs = extra_info['library_dirs']
+#if WITHNUMPY is True:
+#    defines.extend([('WITHNUMPY', None), ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
+#    extra_info = get_info('npymath')
+#    include_dirs.extend(extra_info['include_dirs'])
+#    libs.extend(extra_info['libraries'])
+#    extra_info['library_dirs'].extend(additional_libs)
+#    additional_libs = extra_info['library_dirs']
 
 module1 = Extension('pybmtools',
                     sources = srcs,
@@ -59,12 +59,13 @@ module1 = Extension('pybmtools',
                     library_dirs = additional_libs, 
                     define_macros = defines,
                     include_dirs = include_dirs)
+print(module1)
 
 setup(name = 'pybmtools',
        version = '0.1.1',
        description = 'A package for accessing binaMeth/bm files using libBMtools',
-       author = 'momocoding',
-       author_email = 'mail',
+       author = "momocoding",
+       author_email = "",
        url = "https://github.com/ZhouQiangwei/pybmtools.git",
        download_url = "",
        keywords = ["bioinformatics", "binaMeth", "BM", "bmtools"],

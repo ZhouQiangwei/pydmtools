@@ -20,8 +20,6 @@ extern "C" {
  *
  * External files are accessed using [curl](http://curl.haxx.se/).
  *
- * Please submit issues and pull requests [here](https://github.com/dpryan79/libBinaMeth).
- *
  * \section Compilation
  *
  * Assuming you already have the curl libraries installed (not just the curl binary!):

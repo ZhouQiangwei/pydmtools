@@ -1,4 +1,4 @@
-name: pybmtools
+name: foo
 channels:
   - conda-forge
   - bioconda
