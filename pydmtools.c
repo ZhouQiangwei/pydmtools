@@ -1,6 +1,6 @@
 #include <Python.h>
 #include <inttypes.h>
-#include "pybmtools.h"
+#include "pydmtools.h"
 
 #ifdef WITHNUMPY
 #include <float.h>
@@ -1741,9 +1741,9 @@ static PyObject *pyIsbinaMeth(pybinaMethFile_t *self, PyObject *args) {
 }
 
 #if PY_MAJOR_VERSION >= 3
-PyMODINIT_FUNC PyInit_pybmtools(void) {
+PyMODINIT_FUNC PyInit_pydmtools(void) {
 #else
-PyMODINIT_FUNC initpybmtools(void) {
+PyMODINIT_FUNC initpydmtools(void) {
 #endif
     PyObject *res;
     errno = 0; //just in case

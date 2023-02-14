@@ -179,7 +179,7 @@ A file can be closed with a simple `dm.close()`, as is commonly done with other 
 
 # Numpy
 
-As of version 0.3.0, pyBigWig supports input of coordinates using numpy integers and vectors in some functions **if numpy was installed prior to installing pyBigWig**. To determine if pyBigWig was installed with numpy support by checking the `numpy` accessor:
+As of version 0.1.1, pydmtools supports input of coordinates using numpy integers and vectors in some functions **if numpy was installed prior to installing pydmtools**. To determine if pydmtools was installed with numpy support by checking the `numpy` accessor:
 
     >>> import pydmtools as pydm
     >>> pydm.numpy
@@ -209,4 +209,4 @@ Additionally, `getvalues()` can directly output a numpy vector:
 
 
 # A note on coordinates and library using
-DM files use 1-based coordinates. And pydmtools and dmtools are based on [libbigwig](https://github.com/dpryan79/libBigWig) and [pyBigWig](https://github.com/deeptools/pyBigWig)
+DM files use 1-based coordinates. And pydmtools and dmtools are based on [libbigwig](https://github.com/dpryan79/libBigWig) and [pydmtools](https://github.com/deeptools/pydmtools)

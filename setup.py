@@ -5,10 +5,12 @@ import subprocess
 import glob
 import sys
 try:
-    #from numpy.distutils.misc_util import get_info
+    from numpy.distutils.misc_util import get_info
     from os.path import dirname
+    print("withnumpy TTT")
     WITHNUMPY = True
 except:
+    print("withnumpy FFF")
     WITHNUMPY = False
 
 srcs = [x for x in 
@@ -45,13 +47,13 @@ for v in foo:
         additional_libs.append(v[2:])
 
 include_dirs = ['libdm', sysconfig.get_config_var("INCLUDEPY")]
-#if WITHNUMPY is True:
-#    defines.extend([('WITHNUMPY', None), ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
-#    extra_info = get_info('npymath')
-#    include_dirs.extend(extra_info['include_dirs'])
-#    libs.extend(extra_info['libraries'])
-#    extra_info['library_dirs'].extend(additional_libs)
-#    additional_libs = extra_info['library_dirs']
+if WITHNUMPY is True:
+    defines.extend([('WITHNUMPY', None), ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
+    extra_info = get_info('npymath')
+    include_dirs.extend(extra_info['include_dirs'])
+    libs.extend(extra_info['libraries'])
+    extra_info['library_dirs'].extend(additional_libs)
+    additional_libs = extra_info['library_dirs']
 
 module1 = Extension('pydmtools',
                     sources = srcs,
