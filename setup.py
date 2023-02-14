@@ -12,8 +12,8 @@ except:
     WITHNUMPY = False
 
 srcs = [x for x in 
-    glob.glob("libbm/*.c")]
-srcs.append("pybmtools.c")
+    glob.glob("libdm/*.c")]
+srcs.append("pydmtools.c")
 
 libs=["m", "z"]
 
@@ -38,13 +38,13 @@ try:
 except:
     foo = []
     defines.append(('NOCURL', None))
-    sys.stderr.write("Either libcurl isn't installed, it didn't come with curl-config, or curl-config isn't in your $PATH. pyBM will be installed without support for remote files.\n")
+    sys.stderr.write("Either libcurl isn't installed, it didn't come with curl-config, or curl-config isn't in your $PATH. pyDM will be installed without support for remote files.\n")
 
 for v in foo:
     if v[0:2] == '-L':
         additional_libs.append(v[2:])
 
-include_dirs = ['libbm', sysconfig.get_config_var("INCLUDEPY")]
+include_dirs = ['libdm', sysconfig.get_config_var("INCLUDEPY")]
 #if WITHNUMPY is True:
 #    defines.extend([('WITHNUMPY', None), ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
 #    extra_info = get_info('npymath')
@@ -53,7 +53,7 @@ include_dirs = ['libbm', sysconfig.get_config_var("INCLUDEPY")]
 #    extra_info['library_dirs'].extend(additional_libs)
 #    additional_libs = extra_info['library_dirs']
 
-module1 = Extension('pybmtools',
+module1 = Extension('pydmtools',
                     sources = srcs,
                     libraries = libs,
                     library_dirs = additional_libs, 
@@ -61,14 +61,14 @@ module1 = Extension('pybmtools',
                     include_dirs = include_dirs)
 print(module1)
 
-setup(name = 'pybmtools',
+setup(name = 'pydmtools',
        version = '0.1.1',
-       description = 'A package for accessing binaMeth/bm files using libBMtools',
+       description = 'A package for accessing binaMeth/dm files using libDMtools',
        author = "momocoding",
        author_email = "",
-       url = "https://github.com/ZhouQiangwei/pybmtools.git",
+       url = "https://github.com/ZhouQiangwei/pydmtools.git",
        download_url = "",
-       keywords = ["bioinformatics", "binaMeth", "BM", "bmtools"],
+       keywords = ["bioinformatics", "binaMeth", "DM", "dmtools"],
        classifier = ["Development Status :: 5 - Production/Stable",
                      "Intended Audience :: Developers",
                      "License :: OSI Approved",
