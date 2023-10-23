@@ -3,7 +3,7 @@
 <a href="http://bioconda.github.io"><img src="https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg"></a>
 <a href="https://pypistats.org/packages/pydmtools"><img alt="PyPI Downloads" src="https://img.shields.io/pypi/dm/pydmtools"></a>
 <a href="https://anaconda.org/bioconda/pydmtools"><img alt="License" src="https://anaconda.org/bioconda/pydmtools/badges/license.svg"></a>
-<a href="https://anaconda.org/bioconda/pydmtools"><img alt="Conda Downloads" src="https://anaconda.org/bioconda/pydmtools/badges/downloads.svg"></a>
+<a href="https://anaconda.org/bioconda/pydmtools"><img alt="Conda Downloads" src="https://img.shields.io/conda/d/bioconda/pydmtools"></a>
 </p>
 
 # pyDMtools
