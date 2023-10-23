@@ -1,7 +1,7 @@
 <p>
 <a href="https://dmtools-docs.readthedocs.io/en/latest/function/pydmtools.html" target="_blank"><img src="https://img.shields.io/badge/docs-8A2BE2?link=https%3A%2F%2Fdmtools-docs.rtfd.io"></a>
 <a href="http://bioconda.github.io"><img src="https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg"></a>
-<a href="https://pypistats.org/packages/pydmtools"><img alt="PyPI Downloads" src="https://img.shields.io/pypi/dm/pydmtools"></a>
+<a href="https://pypistats.org/packages/pydmtools"><img alt="PyPI Downloads" src="https://img.shields.io/pypi/dm/pydmtools?label=PyPI%20download"></a>
 <a href="https://anaconda.org/bioconda/pydmtools"><img alt="License" src="https://anaconda.org/bioconda/pydmtools/badges/license.svg"></a>
 <a href="https://anaconda.org/bioconda/pydmtools"><img alt="Conda Downloads" src="https://img.shields.io/conda/d/bioconda/pydmtools"></a>
 </p>
