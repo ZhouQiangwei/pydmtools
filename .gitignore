@@ -1,4 +1,4 @@
 *.sh
 dist
 build
-pybmtools.egg-info
+pydmtools.egg-info

@@ -1,5 +1,10 @@
-
-[![bioconda-badge](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg)](http://bioconda.github.io)
+<p>
+<a href="https://dmtools-docs.readthedocs.io/en/latest/function/pydmtools.html" target="_blank"><img src="https://img.shields.io/badge/docs-8A2BE2?link=https%3A%2F%2Fdmtools-docs.rtfd.io"></a>
+<a href="http://bioconda.github.io"><img src="https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg"></a>
+<a href="https://pypistats.org/packages/pydmtools"><img alt="PyPI Downloads" src="https://img.shields.io/pypi/dm/pydmtools"></a>
+<a href="https://anaconda.org/bioconda/pydmtools"><img alt="License" src="https://anaconda.org/bioconda/pydmtools/badges/license.svg"></a>
+<a href="https://anaconda.org/bioconda/pydmtools"><img alt="Conda Downloads" src="https://anaconda.org/bioconda/pydmtools/badges/downloads.svg"></a>
+</p>
 
 # pyDMtools
 A python extension, written in C, for quick access to DM files and access to and creation of DM files. This extension uses [dmtools](https://github.com/ZhouQiangwei/dmtools) for local and remote file access.
@@ -28,6 +33,10 @@ Table of Contents
 You can install this extension directly from github with:
 
     pip install pydmtools
+    
+    OR
+    
+    pip install pydmtools==0.1.1
 
 or with conda
 
