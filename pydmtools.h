@@ -16,6 +16,7 @@ typedef struct {
 
 static PyObject *pyBmOpen(PyObject *self, PyObject *args, PyObject *kwds);
 static PyObject *pyBmEnter(pybinaMethFile_t *self, PyObject *args);
+static PyObject *pyBmExit(pybinaMethFile_t *self, PyObject *args);
 static PyObject *pyBmClose(pybinaMethFile_t *pybm, PyObject *args);
 static PyObject *pyBmGetChroms(pybinaMethFile_t *pybm, PyObject *args);
 static PyObject *pyIsbinaMeth(pybinaMethFile_t *pybm, PyObject *args);
@@ -72,6 +73,15 @@ These are returned as a dictionary.\n\
 {'maxVal': 2L, 'sumData': 272L, 'minVal': 0L, 'version': 4L,\n\
 'sumSquared': 500L, 'nLevels': 1L, 'nBasesCovered': 154L}\n\
 >>> bm.close()\n"},
+    {"__enter__", (PyCFunction)pyBmEnter, METH_VARARGS,
+"Return self so binaMethFile objects can be used as context managers.\n\
+\n\
+>>> import pybinaMeth\n\
+>>> with pybinaMeth.open(\"some_file.bm\") as bm:\n\
+...     bm.chroms()\n"},
+    {"__exit__", (PyCFunction)pyBmExit, METH_VARARGS,
+"Close a binaMeth file when leaving a context manager block. Any exception\n\
+raised inside the block will be propagated.\n"},
     {"close", (PyCFunction)pyBmClose, METH_VARARGS,
 "Close a binaMeth file.\n\
 \n\

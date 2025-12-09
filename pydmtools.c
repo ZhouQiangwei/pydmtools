@@ -215,6 +215,24 @@ PyObject* pyBmEnter(pybinaMethFile_t*self, PyObject *args) {
     return (PyObject*) self;
 }
 
+PyObject* pyBmExit(pybinaMethFile_t *self, PyObject *args) {
+    // PEP 343 requires __exit__ to accept three positional arguments after self
+    // (exc_type, exc, traceback). We don't need them for cleanup.
+    PyObject *exc_type = NULL, *exc = NULL, *traceback = NULL;
+
+    if(!PyArg_UnpackTuple(args, "__exit__", 3, 3, &exc_type, &exc, &traceback)) {
+        return NULL;
+    }
+
+    if(self->bm) {
+        bmClose(self->bm);
+        self->bm = NULL;
+    }
+
+    Py_INCREF(Py_False);
+    return Py_False; // Returning False propagates any exception that occurred
+}
+
 PyObject* pyBmOpen(PyObject *self, PyObject *args, PyObject *kwds) {
     char *fname = NULL;
     char *mode = "r";
@@ -287,8 +305,11 @@ static void pyBmDealloc(pybinaMethFile_t *self) {
 }
 
 static PyObject *pyBmClose(pybinaMethFile_t *self, PyObject *args) {
-    bmClose(self->bm);
-    self->bm = NULL;
+    if(self->bm) {
+        bmClose(self->bm);
+        self->bm = NULL;
+    }
+
     Py_INCREF(Py_None);
     return Py_None;
 }

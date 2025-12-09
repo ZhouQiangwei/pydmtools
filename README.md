@@ -64,6 +64,12 @@ This will work if your working directory is the pydmtools source code directory.
 
     >>> dm = pydm.openfile("test/test.dm")
 
+You can also use `openfile` as a context manager to ensure files are closed
+even when an exception is raised:
+
+    >>> with pydm.openfile("test/test.dm") as dm:
+    ...     dm.chroms()
+
 Note that if the file doesn't exist you'll see an error message and `None` will be returned. Be default, all files are opened for reading and not writing. You can alter this by passing a mode containing `w`:
 
     >>> dm = pydm.openfile("test/output.dm", "w")
