@@ -4,6 +4,12 @@
 
 #define pybinaMethVersion "0.1.1"
 
+// Bits in the 16-bit DM header version that describe the on-disk layout.
+// These mirror the layout detection logic in dmtools' C implementation so
+// Python callers can reliably infer which optional columns (end/coverage/
+// strand/context/id) are available.
+#define BM_LAYOUT_MASK (BM_MAGIC | BM_END | BM_ID | BM_CONTEXT | BM_STRAND | BM_COVER)
+
 typedef struct {
     PyObject_HEAD
     binaMethFile_t *bm;

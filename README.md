@@ -117,6 +117,13 @@ The header also reports a `type` bitmask that signals which metadata fields are 
 * `BM_STRAND` (strand flags)
 * `BM_CONTEXT` (methylation contexts)
 * `BM_ID` (string identifiers)
+* `BM_END` (records contain explicit end coordinates)
+* `BM_MAGIC` (marks the file as DM rather than bigBed)
+
+These constants match the current `dmtools` implementation on the
+`codex/investigate-memory-management-issues-in-dmtools` branch; `pydmtools`
+masks the header version with the DM layout bits so the `type`/`fields` view
+reflects exactly which optional columns are present.
 
 When writing, pydmtools encodes your requested layout into the header version so readers can inspect `header()["type"]` (or
 `header()["fields"]`) before choosing which columns to request:

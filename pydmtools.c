@@ -267,8 +267,9 @@ PyObject* pyBmOpen(PyObject *self, PyObject *args, PyObject *kwds) {
     }
     
     if(!mode || !strchr(mode, 'w')) {
-        //change type to version
-        bm->type = bm->hdr->version;
+        // Normalize to the layout bits stored in the version header. This is
+        // how dmtools exposes which optional DM columns are present.
+        bm->type = bm->hdr->version & BM_LAYOUT_MASK;
     }else{
         if(strcmp(pend, "Y") == 0){
             write_type |= BM_END;
@@ -1233,8 +1234,10 @@ PyObject *pyBmAddHeader(pybinaMethFile_t *self, PyObject *args, PyObject *kwds) 
     }
 
     // Encode the feature layout (coverage/strand/context/id/end) in the header version
-    // so readers can reliably discover which columns are present.
-    bm->hdr->version = bm->type;
+    // so readers can reliably discover which columns are present. Masking with
+    // BM_LAYOUT_MASK keeps the stored header compatible with dmtools' version
+    // decoding scheme.
+    bm->hdr->version = bm->type & BM_LAYOUT_MASK;
 
     //Create the chromosome list
     bm->cl = bmCreateChromList(chroms, lengths, n);
@@ -2034,6 +2037,8 @@ PyMODINIT_FUNC initpydmtools(void) {
     PyModule_AddIntConstant(res, "BM_STRAND", BM_STRAND);
     PyModule_AddIntConstant(res, "BM_CONTEXT", BM_CONTEXT);
     PyModule_AddIntConstant(res, "BM_ID", BM_ID);
+    PyModule_AddIntConstant(res, "BM_END", BM_END);
+    PyModule_AddIntConstant(res, "BM_MAGIC", BM_MAGIC);
 
 #if PY_MAJOR_VERSION >= 3
     return res;
