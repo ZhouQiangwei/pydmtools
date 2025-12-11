@@ -215,6 +215,24 @@ PyObject* pyBmEnter(pybinaMethFile_t*self, PyObject *args) {
     return (PyObject*) self;
 }
 
+PyObject* pyBmExit(pybinaMethFile_t *self, PyObject *args) {
+    // PEP 343 requires __exit__ to accept three positional arguments after self
+    // (exc_type, exc, traceback). We don't need them for cleanup.
+    PyObject *exc_type = NULL, *exc = NULL, *traceback = NULL;
+
+    if(!PyArg_UnpackTuple(args, "__exit__", 3, 3, &exc_type, &exc, &traceback)) {
+        return NULL;
+    }
+
+    if(self->bm) {
+        bmClose(self->bm);
+        self->bm = NULL;
+    }
+
+    Py_INCREF(Py_False);
+    return Py_False; // Returning False propagates any exception that occurred
+}
+
 PyObject* pyBmOpen(PyObject *self, PyObject *args, PyObject *kwds) {
     char *fname = NULL;
     char *mode = "r";
@@ -249,19 +267,24 @@ PyObject* pyBmOpen(PyObject *self, PyObject *args, PyObject *kwds) {
     }
     
     if(!mode || !strchr(mode, 'w')) {
-        //change type to version
-        bm->type = bm->hdr->version;
+        // Normalize to the layout bits stored in the version header. This is
+        // how dmtools exposes which optional DM columns are present.
+        bm->type = bm->hdr->version & BM_LAYOUT_MASK;
     }else{
+        if(strcmp(pend, "Y") == 0){
+            write_type |= BM_END;
+        }
         if(strcmp(pcover, "Y") == 0){
             write_type |= BM_COVER;
-        }else if(strcmp(pstrand, "Y") == 0){
+        }
+        if(strcmp(pstrand, "Y") == 0){
             write_type |= BM_STRAND;
-        }else if(strcmp(pcontext, "Y") == 0){
+        }
+        if(strcmp(pcontext, "Y") == 0){
             write_type |= BM_CONTEXT;
-        }else if(strcmp(pID, "Y") == 0){
+        }
+        if(strcmp(pID, "Y") == 0){
             write_type |= BM_ID;
-        }else if(strcmp(pend, "Y") == 0){
-            write_type |= BM_END;
         }
         bm->type = write_type;
     }
@@ -287,8 +310,11 @@ static void pyBmDealloc(pybinaMethFile_t *self) {
 }
 
 static PyObject *pyBmClose(pybinaMethFile_t *self, PyObject *args) {
-    bmClose(self->bm);
-    self->bm = NULL;
+    if(self->bm) {
+        bmClose(self->bm);
+        self->bm = NULL;
+    }
+
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -296,7 +322,7 @@ static PyObject *pyBmClose(pybinaMethFile_t *self, PyObject *args) {
 //Accessor for the header (version, nLevels, nBasesCovered, minVal, maxVal, sumData, sumSquared
 static PyObject *pyBmGetHeader(pybinaMethFile_t *self, PyObject *args) {
     binaMethFile_t *bm = self->bm;
-    PyObject *ret, *val;
+    PyObject *ret, *val, *fields;
 
     if(!bm) {
         PyErr_SetString(PyExc_RuntimeError, "The binaMeth file handle is not opened!");
@@ -329,11 +355,44 @@ static PyObject *pyBmGetHeader(pybinaMethFile_t *self, PyObject *args) {
     val = PyFloat_FromDouble(bm->hdr->sumSquared);
     if(PyDict_SetItemString(ret, "sumSquared", val) == -1) goto error;
     Py_DECREF(val);
+    val = PyLong_FromUnsignedLong(bm->type);
+    if(PyDict_SetItemString(ret, "type", val) == -1) goto error;
+    Py_DECREF(val);
+
+    fields = PyList_New(0);
+    if(bm->type & BM_END) {
+        val = PyUnicode_FromString("end");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_COVER) {
+        val = PyUnicode_FromString("coverage");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_STRAND) {
+        val = PyUnicode_FromString("strand");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_CONTEXT) {
+        val = PyUnicode_FromString("context");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_ID) {
+        val = PyUnicode_FromString("id");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(PyDict_SetItemString(ret, "fields", fields) == -1) goto error;
+    Py_DECREF(fields);
 
     return ret;
 
 error :
     Py_XDECREF(val);
+    Py_XDECREF(fields);
     Py_XDECREF(ret);
     PyErr_SetString(PyExc_RuntimeError, "Received an error while getting the binaMeth header!");
     return NULL;
@@ -849,6 +908,197 @@ static PyObject *pyBmGetIntervals(pybinaMethFile_t *self, PyObject *args, PyObje
     return ret;
 }
 
+static PyObject *pyBmGetEntries(pybinaMethFile_t *self, PyObject *args, PyObject *kwds) {
+    binaMethFile_t *bm = self->bm;
+    uint32_t start, end = -1, tid, i;
+    unsigned long startl = 0, endl = -1;
+    static char *kwd_list[] = {"chrom", "start", "end", "with_coverage", "with_strand", "with_context", "with_id", NULL};
+    bmOverlappingIntervals_t *intervals = NULL;
+    char *chrom;
+    PyObject *ret = NULL, *starto = NULL, *endo = NULL;
+    PyObject *withCoverage = Py_None, *withStrand = Py_None, *withContext = Py_None, *withId = Py_None;
+    int exposeCoverage = 0, exposeStrand = 0, exposeContext = 0, exposeId = 0;
+
+    if(!bm) {
+        PyErr_SetString(PyExc_RuntimeError, "The binaMeth file handle is not opened!");
+        return NULL;
+    }
+
+    if(bm->isWrite == 1) {
+        PyErr_SetString(PyExc_RuntimeError, "Entries cannot be accessed in files opened for writing!");
+        return NULL;
+    }
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|OOOOOO", kwd_list, &chrom, &starto, &endo, &withCoverage, &withStrand, &withContext, &withId)) {
+        PyErr_SetString(PyExc_RuntimeError, "You must supply at least a chromosome.\n");
+        return NULL;
+    }
+
+    tid = bmGetTid(bm, chrom);
+    if(endl == (unsigned long) -1 && tid != (uint32_t) -1) endl = bm->cl->len[tid];
+    if(tid == (uint32_t) -1 || startl > end || endl > end) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid interval bounds!");
+        return NULL;
+    }
+
+    if(starto) {
+#ifdef WITHNUMPY
+        if(PyArray_IsScalar(starto, Integer)) {
+            startl = (long) getNumpyL(starto);
+        } else
+#endif
+        if(PyLong_Check(starto)) {
+            startl = PyLong_AsLong(starto);
+#if PY_MAJOR_VERSION < 3
+        } else if(PyInt_Check(starto)) {
+            startl = PyInt_AsLong(starto);
+#endif
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "The start coordinate must be a number!");
+            return NULL;
+        }
+    }
+
+    if(endo) {
+#ifdef WITHNUMPY
+        if(PyArray_IsScalar(endo, Integer)) {
+            endl = (long) getNumpyL(endo);
+        } else
+#endif
+        if(PyLong_Check(endo)) {
+            endl = PyLong_AsLong(endo);
+#if PY_MAJOR_VERSION < 3
+        } else if(PyInt_Check(endo)) {
+            endl = PyInt_AsLong(endo);
+#endif
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "The end coordinate must be a number!");
+            return NULL;
+        }
+    }
+
+    start = (uint32_t) startl;
+    end = (uint32_t) endl;
+    if(end <= start || end > bm->cl->len[tid] || start >= end) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid interval bounds!");
+        return NULL;
+    }
+
+    if(withCoverage == Py_True && !(bm->type & BM_COVER)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested coverage but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+    if(withStrand == Py_True && !(bm->type & BM_STRAND)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested strand but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+    if(withContext == Py_True && !(bm->type & BM_CONTEXT)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested context but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+    if(withId == Py_True && !(bm->type & BM_ID)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested id but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+
+    exposeCoverage = (bm->type & BM_COVER) && withCoverage != Py_False;
+    exposeStrand = (bm->type & BM_STRAND) && withStrand != Py_False;
+    exposeContext = (bm->type & BM_CONTEXT) && withContext != Py_False;
+    exposeId = (bm->type & BM_ID) && withId != Py_False;
+
+    if(!hasEntries(bm)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    intervals = bmGetOverlappingIntervals(bm, chrom, start, end);
+    if(!intervals) {
+        PyErr_SetString(PyExc_RuntimeError, "An error occurred while fetching the overlapping intervals!");
+        return NULL;
+    }
+    if(!intervals->l) {
+        bmDestroyOverlappingIntervals(intervals);
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    ret = PyList_New(intervals->l);
+    for(i=0; i<intervals->l; i++) {
+        PyObject *entry = PyDict_New();
+        PyObject *tmp = PyLong_FromUnsignedLong(intervals->start[i]);
+        PyDict_SetItemString(entry, "start", tmp);
+        Py_DECREF(tmp);
+        tmp = PyLong_FromUnsignedLong(intervals->end[i]);
+        PyDict_SetItemString(entry, "end", tmp);
+        Py_DECREF(tmp);
+        tmp = PyFloat_FromDouble(intervals->value[i]);
+        PyDict_SetItemString(entry, "value", tmp);
+        Py_DECREF(tmp);
+
+        if(exposeCoverage) {
+            if(intervals->coverage) {
+                tmp = PyLong_FromUnsignedLong(intervals->coverage[i]);
+                PyDict_SetItemString(entry, "coverage", tmp);
+                Py_DECREF(tmp);
+            } else {
+                Py_INCREF(Py_None);
+                PyDict_SetItemString(entry, "coverage", Py_None);
+            }
+        }
+
+        if(exposeStrand) {
+            if(intervals->strand) {
+                char *strand = ".";
+                if(intervals->strand[i] == 0) strand = "+";
+                else if(intervals->strand[i] == 1) strand = "-";
+                else if(intervals->strand[i] == 2) strand = ".";
+                tmp = PyUnicode_FromString(strand);
+                PyDict_SetItemString(entry, "strand", tmp);
+                Py_DECREF(tmp);
+            } else {
+                Py_INCREF(Py_None);
+                PyDict_SetItemString(entry, "strand", Py_None);
+            }
+        }
+
+        if(exposeContext) {
+            if(intervals->context) {
+                char *context = "C";
+                if(intervals->context[i] == 1) context = "CG";
+                else if(intervals->context[i] == 2) context = "CHG";
+                else if(intervals->context[i] == 3) context = "CHH";
+                tmp = PyUnicode_FromString(context);
+                PyDict_SetItemString(entry, "context", tmp);
+                Py_DECREF(tmp);
+            } else {
+                Py_INCREF(Py_None);
+                PyDict_SetItemString(entry, "context", Py_None);
+            }
+        }
+
+        if(exposeId) {
+            if(intervals->entryid && intervals->entryid[i]) {
+                tmp = PyUnicode_FromString(intervals->entryid[i]);
+                PyDict_SetItemString(entry, "id", tmp);
+                Py_DECREF(tmp);
+            } else {
+                Py_INCREF(Py_None);
+                PyDict_SetItemString(entry, "id", Py_None);
+            }
+        }
+
+        if(PyList_SetItem(ret, i, entry)) {
+            Py_DECREF(entry);
+            bmDestroyOverlappingIntervals(intervals);
+            PyErr_SetString(PyExc_RuntimeError, "An error occurred while constructing the output list!");
+            return NULL;
+        }
+    }
+
+    bmDestroyOverlappingIntervals(intervals);
+    return ret;
+}
+
 #if PY_MAJOR_VERSION >= 3
 //Return 1 iff obj is a ready unicode type
 int PyString_Check(PyObject *obj) {
@@ -982,6 +1232,12 @@ PyObject *pyBmAddHeader(pybinaMethFile_t *self, PyObject *args, PyObject *kwds) 
         PyErr_SetString(PyExc_RuntimeError, "Received an error in bmCreateHdr");
         goto error;
     }
+
+    // Encode the feature layout (coverage/strand/context/id/end) in the header version
+    // so readers can reliably discover which columns are present. Masking with
+    // BM_LAYOUT_MASK keeps the stored header compatible with dmtools' version
+    // decoding scheme.
+    bm->hdr->version = bm->type & BM_LAYOUT_MASK;
 
     //Create the chromosome list
     bm->cl = bmCreateChromList(chroms, lengths, n);
@@ -1777,6 +2033,12 @@ PyMODINIT_FUNC initpydmtools(void) {
     PyModule_AddIntConstant(res, "remote", 1);
 #endif
     PyModule_AddStringConstant(res, "__version__", pybinaMethVersion);
+    PyModule_AddIntConstant(res, "BM_COVER", BM_COVER);
+    PyModule_AddIntConstant(res, "BM_STRAND", BM_STRAND);
+    PyModule_AddIntConstant(res, "BM_CONTEXT", BM_CONTEXT);
+    PyModule_AddIntConstant(res, "BM_ID", BM_ID);
+    PyModule_AddIntConstant(res, "BM_END", BM_END);
+    PyModule_AddIntConstant(res, "BM_MAGIC", BM_MAGIC);
 
 #if PY_MAJOR_VERSION >= 3
     return res;
