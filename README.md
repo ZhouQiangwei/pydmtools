@@ -16,17 +16,15 @@ Table of Contents
     * [Requirements](#requirements)
   * [Usage](#usage)
     * [Load the extension](#load-the-extension)
-    * [Open a DM file](#open-a-DM-file)
-    * [Determining the file type](#determining-the-file-type)
+    * [Open a DM file](#open-a-dm-file)
     * [Access the list of chromosomes and their lengths](#access-the-list-of-chromosomes-and-their-lengths)
-    * [Print the header](#print-the-header)
+    * [Inspect the header](#inspect-the-header)
     * [Compute summary information on a range](#compute-summary-information-on-a-range)
-      * [A note on statistics and zoom levels](#a-note-on-statistics-and-zoom-levels)
     * [Retrieve values for individual bases in a range](#retrieve-values-for-individual-bases-in-a-range)
     * [Retrieve all intervals in a range](#retrieve-all-intervals-in-a-range)
-    * [Add a header to a DM file](#add-a-header-to-a-DM-file)
-    * [Adding entries to a DM file](#adding-entries-to-a-DM-file)
-    * [Close a DM file](#close-a-DM-file)
+    * [Preparing a DM file for writing](#preparing-a-dm-file-for-writing)
+    * [Adding entries (values, coverage, strand, context, id)](#adding-entries-values-coverage-strand-context-id)
+    * [Close a DM file](#close-a-dm-file)
   * [A note on coordinates](#a-note-on-coordinates)
 
 # Installation
@@ -52,146 +50,169 @@ The follow non-python requirements must be installed:
 The headers and libraries for these are required.
 
 # Usage
-Basic usage is as follows:
+pydmtools mirrors the dmtools command-line functionality for reading and writing the DM (DNA methylation) binary format. The snippets below highlight the most common tasks, how the Python API maps to dmtools concepts, and what each argument means.
 
 ## Load the extension
 
-    >>> import pydmtools as pydm
+```python
+>>> import pydmtools as pydm
+```
 
 ## Open a DM file
 
-This will work if your working directory is the pydmtools source code directory.
+```python
+>>> dm = pydm.openfile("tests/test.dm")
+```
 
-    >>> dm = pydm.openfile("test/test.dm")
+`openfile` raises a Python exception when the file cannot be opened. Files are opened in read mode by default. Pass a mode containing "w" to create or replace a DM file for writing:
 
-You can also use `openfile` as a context manager to ensure files are closed
-even when an exception is raised:
+```python
+>>> dm = pydm.openfile("test/output.dm", "w")
+```
 
-    >>> with pydm.openfile("test/test.dm") as dm:
-    ...     dm.chroms()
+`binaMethFile` implements the context manager protocol so files are closed even if an exception is raised:
 
-Note that if the file doesn't exist you'll see an error message and `None` will be returned. Be default, all files are opened for reading and not writing. You can alter this by passing a mode containing `w`:
+```python
+>>> with pydm.openfile("tests/test.dm") as dm:
+...     print(dm.chroms())
+```
 
-    >>> dm = pydm.openfile("test/output.dm", "w")
+DM and bigBed share the same container. Use `dm.isbinaMeth()` to check whether the opened file is a DM file before calling DM-only helpers such as `values` or `stats`:
 
-Note that a file opened for writing can't be queried for its intervals or statistics, it can *only* be written to. If you open a file for writing then you will next need to add a header (see the section on this below).
+```python
+>>> dm.isbinaMeth()
+True
+```
 
+Files opened for writing cannot be queried for intervals or statistics until they are closed and reopened for reading.
 
 ## Access the list of chromosomes and their lengths
 
-`binaMethFile` objects contain a dictionary holding the chromosome lengths, which can be accessed with the `chroms()` accessor.
+`dm.chroms()` returns a chromosome-length mapping derived from the on-disk header:
 
-    >>> dm.chroms()
-    dict_proxy({'chr1': 195471971L, 'chr10': 130694993L})
+```python
+>>> dm.chroms()
+{'chr1': 195471971, 'chr10': 130694993}
+>>> dm.chroms("chr1")
+195471971
+```
 
-You can also directly query a particular chromosome.
+Unknown chromosome names return `None`.
 
-    >>> dm.chroms("chr1")
-    195471971L
+## Inspect the header
 
-The lengths are stored a the "long" integer type, which is why there's an `L` suffix. If you specify a non-existant chromosome then nothing is output.
+`dm.header()` returns the full header dictionary including zoom-level metadata and summary statistics maintained by dmtools:
 
-    >>> dm.chroms("chr1")
-    >>> 
-
-## Print the header
-
-It's sometimes useful to print a DM's header. This is presented here as a python dictionary containing: the version (typically `4`), the number of zoom levels (`nLevels`), the number of bases described (`nBasesCovered`), the minimum value (`minVal`), the maximum value (`maxVal`), the sum of all values (`sumData`), and the sum of all squared values (`sumSquared`). The last two of these are needed for determining the mean and standard deviation.
-
-    >>> dm.header()
-    {'version': 61951, 'nLevels': 1, 'nBasesCovered': 2669, 'minVal': 0, 'maxVal': 1, 'sumData': 128.40874156728387, 'sumSquared': 97.26764956510321}
-
+```python
+>>> dm.header()
+{'version': 61951, 'nLevels': 1, 'nBasesCovered': 2669, 'minVal': 0, 'maxVal': 1, 'sumData': 128.4087, 'sumSquared': 97.2676}
+```
 
 ## Compute summary information on a range
 
-DM files are used to store values associated with positions and ranges of them. Typically we want to quickly access the average value over a range, which is very simple:
+`dm.stats()` mirrors `dmtools stats` and supports all core statistics plus methylation-aware filters:
 
-    >>> dm.stats("chr1", 0, 10000)
-    [0.2000000054637591]
+```python
+>>> dm.stats("chr1", 0, 10000)            # mean is the default
+[0.2000000054637591]
+>>> dm.stats("chr1", 0, 1000, type="max")
+[0.30000001192092896]
+>>> dm.stats("chr1", 0, 10, type="coverage")  # covered base fraction
+[0.30000000000000004]
+>>> dm.stats("chr1", 0, 3, type="std")         # standard deviation
+[0.10000000521540645]
+```
 
-Suppose instead of the mean value, we instead wanted the maximum value:
+Additional options:
 
-    >>> dm.stats("chr1", 0, 1000, type="max")
-    [0.30000001192092896]
+* `type`: one of `mean`, `min`, `max`, `coverage` (or `cov`), `sum`, `std`, `dev`, or `weight` (coverage-weighted methylation mean).
+* `nBins`: split the queried region into this many bins before computing stats (defaults to 1).
+* `step`: override the bin step size when using `nBins`.
+* `strand`: filter intervals by strand (`"."`, `"+"`, or `"-"`).
+* `context`: filter methylation context (`"C"/"ALL"`, `"CG"`, `"CHG"`, `"CHH"`).
+* `exact`: when `True`, bypasses zoom-level aggregation and forces full-resolution computation.
+* `numpy`: return a NumPy array when NumPy support is available (see [Numpy](#numpy)).
 
-Other options are "weighted" (the weighted average DNA methylation value)
-
-It's often the case that we would instead like to compute values of some number of evenly spaced bins in a given interval, which is also simple:
-
-    >>> dm.stats("1",99, 200, nBins=2)
-    [1.399999976158142, 1.5]
-
-`nBins` defaults to 1, just as `type` defaults to `mean`.
-
-If the start and end positions are omitted then the entire chromosome is used:
-
-    >>> dm.stats("chr1")
-    [1.3351851569281683]
+If `start`/`end` are omitted, the entire chromosome is used. When a region contains no data, the returned list (or array) contains `None`/`nan` placeholders.
 
 ## Retrieve values for individual bases in a range
 
-While the `stats()` method **can** be used to retrieve the original values for each base (e.g., by setting `nBins` to the number of bases), it's preferable to instead use the `getvalues()` accessor.
+`dm.getvalues()` returns the base-resolution values from the file:
 
-    >>> dm.getvalues("chr1", 0, 3)
-    [0.10000000149011612, 0.20000000298023224, 0.30000001192092896]
+```python
+>>> dm.getvalues("chr1", 0, 4)
+[0.10000000149011612, 0.20000000298023224, 0.30000001192092896, nan]
+```
 
-The list produced will always contain one value for every base in the range specified. If a particular base has no associated value in the DM file then the returned value will be `nan`.
-
-    >>> dm.getvalues("chr1", 0, 4)
-    [0.10000000149011612, 0.20000000298023224, 0.30000001192092896, nan]
+The length of the result matches the queried range; uncovered bases are reported as `nan` (or `None` when NumPy is not requested). Add `numpy=True` to receive a NumPy array if available.
 
 ## Retrieve all intervals in a range
 
-Sometimes it's convenient to retrieve all entries overlapping some range. This can be done with the `intervals()` function:
+Use `dm.intervals()` to pull the stored intervals (start, end, value) that overlap a region:
 
-    >>> dm.intervals("chr1", 0, 3)
-    ((0, 1, 0.10000000149011612), (1, 2, 0.20000000298023224), (2, 3, 0.30000001192092896))
+```python
+>>> dm.intervals("chr1", 0, 3)
+((0, 1, 0.10000000149011612), (1, 2, 0.20000000298023224), (2, 3, 0.30000001192092896))
+```
 
-What's returned is a list of tuples containing: the start position, end end position, and the value. Thus, the example above has values of `0.1`, `0.2`, and `0.3` at positions `0`, `1`, and `2`, respectively.
+Omitting `start`/`end` returns all intervals on the chromosome. For bigBed inputs that lack numeric values, use the dmtools `entries` interface instead of `intervals`/`values`.
 
-If the start and end position are omitted then all intervals on the chromosome specified are returned:
+## Preparing a DM file for writing
 
-    >>> dm.intervals("chr1")
-    ((0, 1, 0.10000000149011612), (1, 2, 0.20000000298023224), (2, 3, 0.30000001192092896), (100, 150, 1.399999976158142), (150, 151, 1.5))
+1. Open the output in write mode: `dm = pydm.openfile("output.dm", "w")`.
+2. Add a header describing chromosomes and lengths **in order** using `dm.addHeader()`:
 
-## Add a header to a DM file
+```python
+>>> dm.addHeader([("chr1", 1_000_000), ("chr2", 1_500_000)], maxZooms=0)
+```
 
-If you've opened a file for writing then you'll need to give it a header before you can add any entries. The header contains all of the chromosomes, **in order**, and their sizes. If your genome has two chromosomes, chr1 and chr2, of lengths 1 and 1.5 million bases, then the following would add an appropriate header:
+`maxZooms` controls how many zoom levels dmtools will build (default 10). Many genome browsers expect at least one zoom level, so avoid setting `maxZooms=0` unless you know downstream tools can cope.
 
-    >>> dm.addHeader([("chr1", 1000000), ("chr2", 1500000)])
+## Adding entries (values, coverage, strand, context, id)
 
-DM headers are case-sensitive, so `chr1` and `Chr1` are different. Likewise, `1` and `chr1` are not the same, so you can't mix Ensembl and UCSC chromosome names. After adding a header, you can then add entries.
+`dm.addEntries()` matches the dmtools CLI and accepts the three canonical DM encodings. All coordinate inputs are 0-based half-open. Optional per-entry metadata fields allow you to store dmtools methylation attributes alongside values:
 
-By default, up to 10 "zoom levels" are constructed for DM files. You can change this default number with the `maxZooms` optional argument. A common use of this is to create a DM file that simply holds intervals and no zoom levels:
+* `coverages`: list/array of uint16 coverage counts for each value.
+* `strands`: list/array of strand codes (`0`/`+`, `1`/`-`, `2`/`.`).
+* `contexts`: list/array of methylation context codes (`0`/`C`/`ALL`, `1`/`CG`, `2`/`CHG`, `3`/`CHH`).
+* `entryid`: list/array of string identifiers per row.
 
-    >>> dm.addHeader([("chr1", 1000000), ("chr2", 1500000)], maxZooms=0)
+Entries must be added in sorted order by chromosome and start; pass `validate=False` to skip ordering checks (useful for pre-sorted streams, but unsafe otherwise).
 
-If you set `maxTooms=0`, please note that IGV and many other tools WILL NOT WORK as they assume that at least one zoom level will be present. You are advised to use the default unless you do not expect the DM files to be used by other packages.
+### bedGraph-like intervals
 
-## Adding entries to a DM file
+```python
+dm.addEntries(
+    ["chr1", "chr1", "chr1"],
+    [0, 100, 125],
+    ends=[5, 120, 126],
+    values=[0.0, 1.0, 200.0],
+    coverages=[10, 5, 2],
+    strands=["+", "-", "."],
+    contexts=["CG", "CHH", "C"],
+    entryid=["read1", "read2", "read3"],
+)
+```
 
-Assuming you've opened a file for writing and added a header, you can then add entries. Note that the entries **must** be added in order, as DM files always contain ordered intervals. There are three formats that DM files can use internally to store entries.
+### Variable-step intervals
 
-    chr1	0	100	0.0
-    chr1	100	120	1.0
-    chr1	125	126	200.0
+All spans share the same width and chromosome. Starts are provided individually.
 
-These entries would be added as follows:
+```python
+dm.addEntries("chr1", [500, 600, 635], values=[-2.0, 150.0, 25.0], span=20)
+```
 
-    >>> dm.addEntries(["chr1", "chr1", "chr1"], [0, 100, 125], ends=[5, 120, 126], values=[0.0, 1.0, 200.0])
+### Fixed-step intervals
 
-Each entry occupies 12 bytes before compression.
+The span and step are fixed; only the first start is supplied.
 
-Note that pydmtools will try to prevent you from adding entries in an incorrect order. This, however, requires additional over-head. Should that not be acceptable, you can simply specify `validate=False` when adding entries:
-
-    >>> dm.addEntries(["chr1", "chr1", "chr1"], [100, 0, 125], ends=[120, 5, 126], values=[0.0, 1.0, 200.0], validate=False)
-
-You're obviously then responsible for ensuring that you **do not** add entries out of order. The resulting files would otherwise largley not be usable.
+```python
+dm.addEntries("chr1", 900, values=[-5.0, -20.0, 25.0], span=20, step=30)
+```
 
 ## Close a DM file
 
-A file can be closed with a simple `dm.close()`, as is commonly done with other file types. For files opened for writing, closing a file writes any buffered entries to disk, constructs and writes the file index, and constructs zoom levels. Consequently, this can take a bit of time.
-
+Call `dm.close()` (or rely on the context manager) after writing. Closing flushes buffered entries, writes the index, and builds zoom levels, which may take some time on large files.
 # Numpy
 
 As of version 0.1.1, pydmtools supports input of coordinates using numpy integers and vectors in some functions **if numpy was installed prior to installing pydmtools**. To determine if pydmtools was installed with numpy support by checking the `numpy` accessor:
