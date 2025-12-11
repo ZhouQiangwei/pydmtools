@@ -19,12 +19,13 @@ Table of Contents
     * [Open a DM file](#open-a-dm-file)
     * [Access the list of chromosomes and their lengths](#access-the-list-of-chromosomes-and-their-lengths)
     * [Inspect the header](#inspect-the-header)
-    * [Compute summary information on a range](#compute-summary-information-on-a-range)
-    * [Retrieve values for individual bases in a range](#retrieve-values-for-individual-bases-in-a-range)
-    * [Retrieve all intervals in a range](#retrieve-all-intervals-in-a-range)
-    * [Preparing a DM file for writing](#preparing-a-dm-file-for-writing)
-    * [Adding entries (values, coverage, strand, context, id)](#adding-entries-values-coverage-strand-context-id)
-    * [Close a DM file](#close-a-dm-file)
+* [Compute summary information on a range](#compute-summary-information-on-a-range)
+* [Retrieve values for individual bases in a range](#retrieve-values-for-individual-bases-in-a-range)
+* [Retrieve all intervals in a range](#retrieve-all-intervals-in-a-range)
+* [Retrieve rich entry records (coverage/strand/context/id)](#retrieve-rich-entry-records-coveragestrandcontextid)
+* [Preparing a DM file for writing](#preparing-a-dm-file-for-writing)
+* [Adding entries (values, coverage, strand, context, id)](#adding-entries-values-coverage-strand-context-id)
+* [Close a DM file](#close-a-dm-file)
   * [A note on coordinates](#a-note-on-coordinates)
 
 # Installation
@@ -108,6 +109,20 @@ Unknown chromosome names return `None`.
 {'version': 61951, 'nLevels': 1, 'nBasesCovered': 2669, 'minVal': 0, 'maxVal': 1, 'sumData': 128.4087, 'sumSquared': 97.2676}
 ```
 
+The header also reports a `type` bitmask that signals which metadata fields are present in each record:
+
+* `BM_COVER` (coverage values) 
+* `BM_STRAND` (strand flags)
+* `BM_CONTEXT` (methylation contexts)
+* `BM_ID` (string identifiers)
+
+These constants are exported at the module level so you can inspect a file before deciding how to query it:
+
+```python
+>>> dm.header()["type"] & pydm.BM_CONTEXT
+0x1c0
+```
+
 ## Compute summary information on a range
 
 `dm.stats()` mirrors `dmtools stats` and supports all core statistics plus methylation-aware filters:
@@ -156,6 +171,24 @@ Use `dm.intervals()` to pull the stored intervals (start, end, value) that overl
 ```
 
 Omitting `start`/`end` returns all intervals on the chromosome. For bigBed inputs that lack numeric values, use the dmtools `entries` interface instead of `intervals`/`values`.
+
+## Retrieve rich entry records (coverage/strand/context/id)
+
+When the DM header indicates additional fields (coverage, strand, methylation context, ID), `dm.entries()` returns per-record dictionaries with everything decoded for you:
+
+```python
+>>> recs = dm.entries("chr1", 0, 10)
+>>> recs[0]
+{'start': 0, 'end': 1, 'value': 0.1, 'coverage': 7, 'strand': '+', 'context': 'CG', 'id': 'read1'}
+```
+
+By default, `entries` only includes metadata that the file actually stores. You can force inclusion or exclusion with keyword flags:
+
+```python
+# Drop coverage even if present
+>>> dm.entries("chr1", 0, 10, with_coverage=False)[0]["coverage"]
+None
+```
 
 ## Preparing a DM file for writing
 

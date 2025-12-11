@@ -27,6 +27,7 @@ static PyObject *pyBmGetValues(pybinaMethFile_t *pybm, PyObject *args, PyObject 
 static PyObject *pyBmGetValues(pybinaMethFile_t *pybm, PyObject *args);
 #endif
 static PyObject *pyBmGetIntervals(pybinaMethFile_t *pybm, PyObject *args, PyObject *kwds);
+static PyObject *pyBmGetEntries(pybinaMethFile_t *pybm, PyObject *args, PyObject *kwds);
 static PyObject *pyBmGetHeader(pybinaMethFile_t *pybm, PyObject *args);
 static PyObject *pyBmAddHeader(pybinaMethFile_t *pybm, PyObject *args, PyObject *kwds);
 static PyObject *pyBmAddEntries(pybinaMethFile_t *pybm, PyObject *args, PyObject *kwds);
@@ -233,6 +234,27 @@ end of 10 specifies the first 10 positions).\n\
 >>> bm.intervals(\"1\", 0, 3)\n\
 ((0, 1, 0.10000000149011612), (1, 2, 0.20000000298023224),\n\
  (2, 3, 0.30000001192092896))\n\
+>>> bm.close()"},
+    {"entries", (PyCFunction)pyBmGetEntries, METH_VARARGS|METH_KEYWORDS,
+"Return per-entry dictionaries for a region, including optional metadata such\n\
+as coverage, strand, context, and id when present in the file header.\n\
+\n\
+Positional arguments:\n\
+    chr:   Chromosome name\n\
+\n\
+Keyword arguments:\n\
+    start: Starting position (defaults to 0)\n\
+    end:   Ending position (defaults to the end of the chromosome)\n\
+    with_coverage/with_strand/with_context/with_id: Force inclusion or\n\
+        exclusion of metadata fields regardless of the header bitmask.\n\
+\n\
+Each returned dictionary always contains 'start', 'end', and 'value'. When a\n\
+metadata field is requested but not present on disk its value is None.\n\
+\n\
+>>> bm = pybinaMeth.open(\"test/test.bm\")\n\
+>>> bm.entries(\"1\", 0, 3)[0]\n\
+{'start': 0, 'end': 1, 'value': 0.10000000149011612, 'coverage': 10,\n\
+ 'strand': '+', 'context': 'CG', 'id': 'read1'}\n\
 >>> bm.close()"},
     {"addHeader", (PyCFunction)pyBmAddHeader, METH_VARARGS|METH_KEYWORDS,
 "Adds a header to a file opened for writing. This MUST be called before adding\n\
