@@ -55,7 +55,7 @@ if WITHNUMPY is True:
     extra_info['library_dirs'].extend(additional_libs)
     additional_libs = extra_info['library_dirs']
 
-module1 = Extension('pydmtools',
+module1 = Extension('pydmtools.pydmtools',
                     sources = srcs,
                     libraries = libs,
                     library_dirs = additional_libs, 

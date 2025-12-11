@@ -264,6 +264,23 @@ The span and step are fixed; only the first start is supplied.
 dm.addEntries("chr1", 900, values=[-5.0, -20.0, 25.0], span=20, step=30)
 ```
 
+### High-level conveniences
+
+Lightweight helpers in :mod:`pydmtools.highlevel` can turn query results into
+data frames, compute per-cell QC summaries, or aggregate a simple cell × region
+matrix:
+
+```
+import pydmtools as pydm
+from pydmtools.highlevel import entries_to_df, per_cell_qc, region_matrix
+
+with pydm.openfile("singlecell.dm") as dm:
+    df = entries_to_df(dm, "chr1", 0, 100000)
+    qc = per_cell_qc(dm, context="CG", min_coverage=3)
+    regions = [("chr1", 0, 10000), ("chr1", 10000, 20000)]
+    X, cell_ids, regs = region_matrix(dm, regions, sparse=True, return_mapping=True)
+```
+
 ## Close a DM file
 
 Call `dm.close()` (or rely on the context manager) after writing. Closing flushes buffered entries, writes the index, and builds zoom levels, which may take some time on large files.
