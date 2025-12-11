@@ -270,16 +270,20 @@ PyObject* pyBmOpen(PyObject *self, PyObject *args, PyObject *kwds) {
         //change type to version
         bm->type = bm->hdr->version;
     }else{
+        if(strcmp(pend, "Y") == 0){
+            write_type |= BM_END;
+        }
         if(strcmp(pcover, "Y") == 0){
             write_type |= BM_COVER;
-        }else if(strcmp(pstrand, "Y") == 0){
+        }
+        if(strcmp(pstrand, "Y") == 0){
             write_type |= BM_STRAND;
-        }else if(strcmp(pcontext, "Y") == 0){
+        }
+        if(strcmp(pcontext, "Y") == 0){
             write_type |= BM_CONTEXT;
-        }else if(strcmp(pID, "Y") == 0){
+        }
+        if(strcmp(pID, "Y") == 0){
             write_type |= BM_ID;
-        }else if(strcmp(pend, "Y") == 0){
-            write_type |= BM_END;
         }
         bm->type = write_type;
     }
@@ -317,7 +321,7 @@ static PyObject *pyBmClose(pybinaMethFile_t *self, PyObject *args) {
 //Accessor for the header (version, nLevels, nBasesCovered, minVal, maxVal, sumData, sumSquared
 static PyObject *pyBmGetHeader(pybinaMethFile_t *self, PyObject *args) {
     binaMethFile_t *bm = self->bm;
-    PyObject *ret, *val;
+    PyObject *ret, *val, *fields;
 
     if(!bm) {
         PyErr_SetString(PyExc_RuntimeError, "The binaMeth file handle is not opened!");
@@ -354,10 +358,40 @@ static PyObject *pyBmGetHeader(pybinaMethFile_t *self, PyObject *args) {
     if(PyDict_SetItemString(ret, "type", val) == -1) goto error;
     Py_DECREF(val);
 
+    fields = PyList_New(0);
+    if(bm->type & BM_END) {
+        val = PyUnicode_FromString("end");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_COVER) {
+        val = PyUnicode_FromString("coverage");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_STRAND) {
+        val = PyUnicode_FromString("strand");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_CONTEXT) {
+        val = PyUnicode_FromString("context");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(bm->type & BM_ID) {
+        val = PyUnicode_FromString("id");
+        if(PyList_Append(fields, val) == -1) goto error;
+        Py_DECREF(val);
+    }
+    if(PyDict_SetItemString(ret, "fields", fields) == -1) goto error;
+    Py_DECREF(fields);
+
     return ret;
 
 error :
     Py_XDECREF(val);
+    Py_XDECREF(fields);
     Py_XDECREF(ret);
     PyErr_SetString(PyExc_RuntimeError, "Received an error while getting the binaMeth header!");
     return NULL;
@@ -949,10 +983,27 @@ static PyObject *pyBmGetEntries(pybinaMethFile_t *self, PyObject *args, PyObject
         return NULL;
     }
 
-    exposeCoverage = ((bm->type & BM_COVER) && withCoverage != Py_False) || withCoverage == Py_True;
-    exposeStrand = ((bm->type & BM_STRAND) && withStrand != Py_False) || withStrand == Py_True;
-    exposeContext = ((bm->type & BM_CONTEXT) && withContext != Py_False) || withContext == Py_True;
-    exposeId = ((bm->type & BM_ID) && withId != Py_False) || withId == Py_True;
+    if(withCoverage == Py_True && !(bm->type & BM_COVER)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested coverage but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+    if(withStrand == Py_True && !(bm->type & BM_STRAND)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested strand but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+    if(withContext == Py_True && !(bm->type & BM_CONTEXT)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested context but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+    if(withId == Py_True && !(bm->type & BM_ID)) {
+        PyErr_Format(PyExc_RuntimeError, "Requested id but DM header version 0x%x does not include it", bm->type);
+        return NULL;
+    }
+
+    exposeCoverage = (bm->type & BM_COVER) && withCoverage != Py_False;
+    exposeStrand = (bm->type & BM_STRAND) && withStrand != Py_False;
+    exposeContext = (bm->type & BM_CONTEXT) && withContext != Py_False;
+    exposeId = (bm->type & BM_ID) && withId != Py_False;
 
     if(!hasEntries(bm)) {
         Py_INCREF(Py_None);
@@ -1180,6 +1231,10 @@ PyObject *pyBmAddHeader(pybinaMethFile_t *self, PyObject *args, PyObject *kwds) 
         PyErr_SetString(PyExc_RuntimeError, "Received an error in bmCreateHdr");
         goto error;
     }
+
+    // Encode the feature layout (coverage/strand/context/id/end) in the header version
+    // so readers can reliably discover which columns are present.
+    bm->hdr->version = bm->type;
 
     //Create the chromosome list
     bm->cl = bmCreateChromList(chroms, lengths, n);

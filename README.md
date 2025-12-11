@@ -109,18 +109,23 @@ Unknown chromosome names return `None`.
 {'version': 61951, 'nLevels': 1, 'nBasesCovered': 2669, 'minVal': 0, 'maxVal': 1, 'sumData': 128.4087, 'sumSquared': 97.2676}
 ```
 
-The header also reports a `type` bitmask that signals which metadata fields are present in each record:
+The header also reports a `type` bitmask that signals which metadata fields are present in each record. pydmtools derives a
+`fields` list from this bitmask so you can see exactly what the DM file stores (for example `['end', 'coverage', 'strand',
+'context', 'id']`). The raw mask uses the following module-level constants:
 
-* `BM_COVER` (coverage values) 
+* `BM_COVER` (coverage values)
 * `BM_STRAND` (strand flags)
 * `BM_CONTEXT` (methylation contexts)
 * `BM_ID` (string identifiers)
 
-These constants are exported at the module level so you can inspect a file before deciding how to query it:
+When writing, pydmtools encodes your requested layout into the header version so readers can inspect `header()["type"]` (or
+`header()["fields"]`) before choosing which columns to request:
 
 ```python
 >>> dm.header()["type"] & pydm.BM_CONTEXT
 0x1c0
+>>> dm.header()["fields"]
+['end', 'coverage', 'strand', 'context', 'id']
 ```
 
 ## Compute summary information on a range
@@ -182,7 +187,8 @@ When the DM header indicates additional fields (coverage, strand, methylation co
 {'start': 0, 'end': 1, 'value': 0.1, 'coverage': 7, 'strand': '+', 'context': 'CG', 'id': 'read1'}
 ```
 
-By default, `entries` only includes metadata that the file actually stores. You can force inclusion or exclusion with keyword flags:
+By default, `entries` only includes metadata that the file actually stores. If you explicitly request a column that the header
+bitmask says is missing, pydmtools raises a clear error. You can always drop stored columns with keyword flags:
 
 ```python
 # Drop coverage even if present
