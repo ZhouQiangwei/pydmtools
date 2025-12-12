@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
+import pytest
 import pydmtools as pydm
-from pydmtools.highlevel import entries_to_df, per_cell_qc, region_matrix
+from pydmtools.highlevel import entries_to_df, per_cell_qc, region_matrix, write_matrix_mtx
 
 
 def make_test_dm(tmp_path):
@@ -51,3 +52,26 @@ def test_region_matrix_shape_and_mapping(tmp_path):
     assert np.isclose(matrix[cell_ids.index("cellB"), 1], 0.4)
     assert np.isclose(matrix[cell_ids.index("cellB"), 2], 0.6)
     assert region_info[0]["chrom"] == "chr1"
+
+
+def test_write_matrix_mtx_outputs(tmp_path):
+    pytest.importorskip("scipy.io")
+    dm = make_test_dm(tmp_path)
+    regions = [("chr1", 0, 15), ("chr1", 15, 35), ("chr1", 35, 50)]
+    out_prefix = tmp_path / "test_sc"
+
+    matrix, cell_ids, _ = write_matrix_mtx(dm, regions, out_prefix=str(out_prefix), sparse=True, return_matrix=True)
+
+    mtx_path = out_prefix.with_suffix(".mtx")
+    barcodes_path = out_prefix.with_suffix(".barcodes.tsv")
+    features_path = out_prefix.with_suffix(".features.tsv")
+
+    assert mtx_path.exists() and mtx_path.stat().st_size > 0
+    assert barcodes_path.exists() and barcodes_path.stat().st_size > 0
+    assert features_path.exists() and features_path.stat().st_size > 0
+
+    barcodes = barcodes_path.read_text().strip().splitlines()
+    features = features_path.read_text().strip().splitlines()
+
+    assert len(barcodes) == matrix.shape[0] == len(cell_ids)
+    assert len(features) == matrix.shape[1]

@@ -26,6 +26,13 @@ def _require_scipy_sparse():
         raise ImportError("region_matrix with sparse=True requires scipy to be installed") from exc
 
 
+def _require_scipy_io():
+    try:
+        return import_module("scipy.io")
+    except ImportError as exc:  # pragma: no cover - thin wrapper
+        raise ImportError("write_matrix_mtx requires scipy.io to be installed") from exc
+
+
 # Public API -----------------------------------------------------------------
 
 
@@ -245,3 +252,85 @@ def region_matrix(dm, regions: Union[Sequence[Tuple[str, int, int]], 'object'],
         return matrix, cell_ids, regions_info
 
     return matrix
+
+
+def write_matrix_mtx(dm, regions: Union[Sequence[Tuple[str, int, int]], 'object'],
+                     out_prefix: str = "sc_dm", sparse: bool = True,
+                     return_matrix: bool = False):
+    """
+    Compute a cell × region matrix from a single dm file and write it in Matrix
+    Market + barcodes.tsv + features.tsv format.
+
+    Parameters
+    ----------
+    dm : dmtools file object
+        A single dm file opened with ``pydmtools.openfile`` and containing an ID
+        field.
+    regions : list of (chrom, start, end) or pandas.DataFrame
+        Regions to aggregate. If a DataFrame, must have ``'chrom'``, ``'start'``,
+        ``'end'`` columns and may have an optional ``'name'`` column.
+    out_prefix : str
+        Prefix for output files. Files written are ``out_prefix + ".mtx"``,
+        ``out_prefix + ".barcodes.tsv"`` and ``out_prefix + ".features.tsv"``.
+    sparse : bool, default True
+        If ``True``, ensure the matrix is sparse and write as Matrix Market. If
+        ``False``, write a dense matrix as Matrix Market.
+    return_matrix : bool, default False
+        If ``True``, also return ``(matrix, cell_ids, regions_info)`` in memory
+        using the same semantics as :func:`region_matrix` with
+        ``return_mapping=True``.
+
+    Returns
+    -------
+    None
+        (or ``matrix, cell_ids, regions_info`` if ``return_matrix=True``)
+    """
+
+    sp_io = _require_scipy_io()
+
+    matrix, cell_ids, regions_info = region_matrix(dm, regions, sparse=sparse, return_mapping=True)
+
+    mm_path = f"{out_prefix}.mtx"
+    barcodes_path = f"{out_prefix}.barcodes.tsv"
+    features_path = f"{out_prefix}.features.tsv"
+
+    sp_io.mmwrite(mm_path, matrix)
+
+    with open(barcodes_path, "w", encoding="utf-8") as fh:
+        for cell_id in cell_ids:
+            fh.write(f"{cell_id}\n")
+
+    # Build features rows in the same order as regions
+    feature_rows = []
+    names: Optional[List[Optional[str]]] = None
+    if not isinstance(regions, list) and hasattr(regions, "to_dict"):
+        _require_pandas()
+        records = regions.to_dict("records")
+        names = [rec.get("name") for rec in records]
+        region_iter: Iterable[Tuple[str, int, int]] = [
+            (rec["chrom"], int(rec["start"]), int(rec["end"])) for rec in records
+        ]
+    else:
+        region_iter = list(regions)  # type: ignore[arg-type]
+
+    for idx, region in enumerate(region_iter, start=1):
+        chrom, start, end = region
+        feature_id = f"region_{idx:06d}"
+        name = None
+        if names is not None:
+            try:
+                name = names[idx - 1]
+            except IndexError:
+                name = None
+        if name is None:
+            name = feature_id
+        feature_rows.append((feature_id, chrom, start, end, name))
+
+    with open(features_path, "w", encoding="utf-8") as fh:
+        for feature_id, chrom, start, end, name in feature_rows:
+            fh.write(f"{feature_id}\t{chrom}\t{start}\t{end}\t{name}\n")
+
+    if return_matrix:
+        return matrix, cell_ids, regions_info
+
+    return None
