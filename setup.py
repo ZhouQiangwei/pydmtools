@@ -1,15 +1,17 @@
 #!/usr/bin/env python
-from setuptools import setup, Extension, find_packages
-from distutils import sysconfig
-import subprocess
+from importlib import import_module, util
 import glob
+import subprocess
 import sys
+import sysconfig
 from os.path import dirname
 
-try:
-    import numpy as np
+from setuptools import Extension, find_packages, setup
+
+if util.find_spec("numpy") is not None:
+    np = import_module("numpy")
     WITHNUMPY = True
-except ImportError:
+else:
     np = None
     WITHNUMPY = False
 
@@ -60,7 +62,7 @@ module1 = Extension('pydmtools.pydmtools',
 print(module1)
 
 setup(name = 'pydmtools',
-       version = '0.1.3',
+       version = '0.1.4',
        description = 'A Software Package for Accessing and Manipulating DM Files',
        author = "momocoding",
        author_email = "",
@@ -85,4 +87,5 @@ setup(name = 'pydmtools',
        packages = find_packages(),
        include_package_data = True,
        extras_require = {'numpy input': ["numpy"]},
+       python_requires=">=3.8",
        ext_modules = [module1])

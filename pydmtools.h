@@ -2,7 +2,7 @@
 #include <structmember.h>
 #include "binaMeth.h"
 
-#define pybinaMethVersion "0.1.3"
+#define pybinaMethVersion "0.1.4"
 
 // Bits in the 16-bit DM header version that describe the on-disk layout.
 // These mirror the layout detection logic in dmtools' C implementation so
