@@ -8,6 +8,11 @@ while also allowing submodules such as :mod:`pydmtools.highlevel`.
 from importlib import import_module
 from types import ModuleType
 
+try:  # Python 3.8+ standard library
+    from importlib.metadata import PackageNotFoundError, version
+except ImportError:  # pragma: no cover - fallback for very old Pythons
+    from importlib_metadata import PackageNotFoundError, version
+
 
 def _load_extension() -> ModuleType:
     """Import the compiled extension packaged alongside this module."""
@@ -22,6 +27,11 @@ def _load_extension() -> ModuleType:
 # Import the compiled extension (packaged as pydmtools.pydmtools)
 _extension: ModuleType = _load_extension()
 
+try:
+    __version__ = version("pydmtools")
+except PackageNotFoundError:  # pragma: no cover - fallback for editable installs
+    __version__ = getattr(_extension, "__version__", "0.0.0")
+
 # Re-export everything that is not private from the extension module.
 for _name in dir(_extension):
     if _name.startswith("__"):
@@ -29,3 +39,4 @@ for _name in dir(_extension):
     globals()[_name] = getattr(_extension, _name)
 
 __all__ = [name for name in dir(_extension) if not name.startswith("__")]
+__all__.append("__version__")
