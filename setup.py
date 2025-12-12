@@ -4,13 +4,13 @@ from distutils import sysconfig
 import subprocess
 import glob
 import sys
+from os.path import dirname
+
 try:
-    from numpy.distutils.misc_util import get_info
-    from os.path import dirname
-    print("withnumpy TTT")
+    import numpy as np
     WITHNUMPY = True
-except:
-    print("withnumpy FFF")
+except ImportError:
+    np = None
     WITHNUMPY = False
 
 srcs = [x for x in 
@@ -49,11 +49,7 @@ for v in foo:
 include_dirs = ['libdm', sysconfig.get_config_var("INCLUDEPY")]
 if WITHNUMPY is True:
     defines.extend([('WITHNUMPY', None), ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
-    extra_info = get_info('npymath')
-    include_dirs.extend(extra_info['include_dirs'])
-    libs.extend(extra_info['libraries'])
-    extra_info['library_dirs'].extend(additional_libs)
-    additional_libs = extra_info['library_dirs']
+    include_dirs.append(np.get_include())
 
 module1 = Extension('pydmtools.pydmtools',
                     sources = srcs,
@@ -64,7 +60,7 @@ module1 = Extension('pydmtools.pydmtools',
 print(module1)
 
 setup(name = 'pydmtools',
-       version = '0.1.1',
+       version = '0.1.3',
        description = 'A Software Package for Accessing and Manipulating DM Files',
        author = "momocoding",
        author_email = "",
