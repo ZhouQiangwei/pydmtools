@@ -62,7 +62,7 @@ module1 = Extension('pydmtools.pydmtools',
 print(module1)
 
 setup(name = 'pydmtools',
-       version = '0.1.4',
+       version = '0.1.5',
        description = 'A Software Package for Accessing and Manipulating DM Files',
        author = "momocoding",
        author_email = "",
