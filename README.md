@@ -35,11 +35,13 @@ You can install this extension directly from github with:
     
     OR
     
-    pip install pydmtools==0.1.1
+    pip install pydmtools==0.1.6
 
 or with conda
 
     conda install pydmtools -c bioconda
+
+From version 0.1.6 onward, pydmtools supports Python 3.8–3.12 and works with both NumPy 1.x and 2.x.
 
 ## Requirements
 
@@ -109,9 +111,13 @@ Unknown chromosome names return `None`.
 {'version': 61951, 'nLevels': 1, 'nBasesCovered': 2669, 'minVal': 0, 'maxVal': 1, 'sumData': 128.4087, 'sumSquared': 97.2676}
 ```
 
-The header also reports a `type` bitmask that signals which metadata fields are present in each record. pydmtools derives a
-`fields` list from this bitmask so you can see exactly what the DM file stores (for example `['end', 'coverage', 'strand',
-'context', 'id']`). The raw mask uses the following module-level constants:
+The header also reports a `type` bitmask derived directly from the DM header
+`version`. Each bit mirrors the layout flags used by the dmtools C library so
+you can tell whether the file actually stores coverage, strand, context, and
+other metadata before trying to read them. pydmtools also derives a `fields`
+list from this bitmask so you can see exactly what the DM file stores (for
+example `['end', 'coverage', 'strand', 'context', 'id']`). The raw mask uses the
+following module-level constants:
 
 * `BM_COVER` (coverage values)
 * `BM_STRAND` (strand flags)
@@ -223,6 +229,10 @@ None
 * `contexts`: list/array of methylation context codes (`0`/`C`/`ALL`, `1`/`CG`, `2`/`CHG`, `3`/`CHH`).
 * `entryid`: list/array of string identifiers per row.
 
+pydmtools updates the DM header's `version` layout bits automatically when you
+pass any of these optional columns, so subsequent readers can discover the
+presence of coverage/strand/context/ID without guesswork.
+
 Entries must be added in sorted order by chromosome and start; pass `validate=False` to skip ordering checks (useful for pre-sorted streams, but unsafe otherwise).
 
 ### bedGraph-like intervals
@@ -256,12 +266,29 @@ The span and step are fixed; only the first start is supplied.
 dm.addEntries("chr1", 900, values=[-5.0, -20.0, 25.0], span=20, step=30)
 ```
 
+### High-level conveniences
+
+Lightweight helpers in :mod:`pydmtools.highlevel` can turn query results into
+data frames, compute per-cell QC summaries, or aggregate a simple cell × region
+matrix:
+
+```
+import pydmtools as pydm
+from pydmtools.highlevel import entries_to_df, per_cell_qc, region_matrix
+
+with pydm.openfile("singlecell.dm") as dm:
+    df = entries_to_df(dm, "chr1", 0, 100000)
+    qc = per_cell_qc(dm, context="CG", min_coverage=3)
+    regions = [("chr1", 0, 10000), ("chr1", 10000, 20000)]
+    X, cell_ids, regs = region_matrix(dm, regions, sparse=True, return_mapping=True)
+```
+
 ## Close a DM file
 
 Call `dm.close()` (or rely on the context manager) after writing. Closing flushes buffered entries, writes the index, and builds zoom levels, which may take some time on large files.
 # Numpy
 
-As of version 0.1.1, pydmtools supports input of coordinates using numpy integers and vectors in some functions **if numpy was installed prior to installing pydmtools**. To determine if pydmtools was installed with numpy support by checking the `numpy` accessor:
+As of version 0.1.6, pydmtools supports input of coordinates using numpy integers and vectors in some functions **if numpy was installed prior to installing pydmtools**. To determine if pydmtools was installed with numpy support by checking the `numpy` accessor:
 
     >>> import pydmtools as pydm
     >>> pydm.numpy
@@ -292,3 +319,7 @@ Additionally, `getvalues()` can directly output a numpy vector:
 
 # A note on coordinates and library using
 DM files use 1-based coordinates. And pydmtools and dmtools are based on [libbigwig](https://github.com/dpryan79/libBigWig) and [pydmtools](https://github.com/deeptools/pydmtools)
+
+## libdm sync
+
+To refresh the vendored `libdm` C sources to match the latest `dmtools` implementation, run `libdm/update_from_dmtools.sh` when network access to GitHub is available. The script copies the upstream files from the `codex/investigate-memory-management-issues-in-dmtools` branch.

@@ -1,16 +1,18 @@
 #!/usr/bin/env python
-from setuptools import setup, Extension, find_packages
-from distutils import sysconfig
-import subprocess
+from importlib import import_module, util
 import glob
+import subprocess
 import sys
-try:
-    from numpy.distutils.misc_util import get_info
-    from os.path import dirname
-    print("withnumpy TTT")
+import sysconfig
+from os.path import dirname
+
+from setuptools import Extension, find_packages, setup
+
+if util.find_spec("numpy") is not None:
+    np = import_module("numpy")
     WITHNUMPY = True
-except:
-    print("withnumpy FFF")
+else:
+    np = None
     WITHNUMPY = False
 
 srcs = [x for x in 
@@ -49,13 +51,9 @@ for v in foo:
 include_dirs = ['libdm', sysconfig.get_config_var("INCLUDEPY")]
 if WITHNUMPY is True:
     defines.extend([('WITHNUMPY', None), ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
-    extra_info = get_info('npymath')
-    include_dirs.extend(extra_info['include_dirs'])
-    libs.extend(extra_info['libraries'])
-    extra_info['library_dirs'].extend(additional_libs)
-    additional_libs = extra_info['library_dirs']
+    include_dirs.append(np.get_include())
 
-module1 = Extension('pydmtools',
+module1 = Extension('pydmtools.pydmtools',
                     sources = srcs,
                     libraries = libs,
                     library_dirs = additional_libs, 
@@ -64,24 +62,24 @@ module1 = Extension('pydmtools',
 print(module1)
 
 setup(name = 'pydmtools',
-       version = '0.1.1',
+       version = '0.1.6',
        description = 'A Software Package for Accessing and Manipulating DM Files',
        author = "momocoding",
        author_email = "",
        url = "https://github.com/ZhouQiangwei/pydmtools.git",
        download_url = "",
        keywords = ["bioinformatics", "DNA methylation", "DM", "dmtools"],
-       classifier = ["Development Status :: 5 - Production/Stable",
+       classifiers = ["Development Status :: 5 - Production/Stable",
                      "Intended Audience :: Developers",
                      "License :: OSI Approved",
                      "Programming Language :: C",
                      "Programming Language :: Python",
-                     "Programming Language :: Python :: 2",
-                     "Programming Language :: Python :: 2.7",
                      "Programming Language :: Python :: 3",
-                     "Programming Language :: Python :: 3.5",
-                     "Programming Language :: Python :: 3.6",
-                     "Programming Language :: Python :: 3.7",
+                     "Programming Language :: Python :: 3.8",
+                     "Programming Language :: Python :: 3.9",
+                     "Programming Language :: Python :: 3.10",
+                     "Programming Language :: Python :: 3.11",
+                     "Programming Language :: Python :: 3.12",
                      "Programming Language :: Python :: Implementation :: CPython",
                      "Operating System :: POSIX",
                      "Operating System :: Unix",
@@ -89,4 +87,5 @@ setup(name = 'pydmtools',
        packages = find_packages(),
        include_package_data = True,
        extras_require = {'numpy input': ["numpy"]},
+       python_requires=">=3.8",
        ext_modules = [module1])

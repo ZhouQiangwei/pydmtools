@@ -2,7 +2,7 @@
 #include <structmember.h>
 #include "binaMeth.h"
 
-#define pybinaMethVersion "0.1.1"
+#define pybinaMethVersion "0.1.6"
 
 // Bits in the 16-bit DM header version that describe the on-disk layout.
 // These mirror the layout detection logic in dmtools' C implementation so
@@ -72,7 +72,14 @@ static PyMethodDef bmObjMethods[] = {
   * The maximum value ('maxVal').\n\
   * The sum of all values ('sumData').\n\
   * The sum of the square of all values ('sumSquared').\n\
-These are returned as a dictionary.\n\
+  * A layout bitmask ('type') derived from the header version that encodes\n\
+    whether optional columns like coverage, strand, context, id, or explicit\n\
+    end positions are present.\n\
+  * A convenience list ('fields') derived from 'type' that names which of the\n\
+    optional columns the DM file actually stores.\n\
+These are returned as a dictionary. The layout bits follow the same masks used\n\
+in the dmtools C implementation (BM_COVER, BM_STRAND, BM_CONTEXT, BM_ID,\n\
+BM_END).\n\
 \n\
 >>> import pybinaMeth\n\
 >>> bm = pybinaMeth.open(\"some_file.bm\")\n\

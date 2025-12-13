@@ -1,4 +1,5 @@
 *.sh
+!libdm/update_from_dmtools.sh
 dist
 build
 pydmtools.egg-info

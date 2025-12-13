@@ -11,6 +11,47 @@
 
 int lsize = NPY_SIZEOF_LONG;
 
+static inline float dm_half_to_float(npy_half h) {
+    /*
+     * NumPy 2.0 removes the exported npy_half_to_float symbol. Perform the
+     * conversion locally using the IEEE-754 half representation to remain
+     * compatible with both NumPy 1.x and 2.x runtimes.
+     */
+    npy_uint16 bits = (npy_uint16)h;
+    int sign = bits >> 15;
+    int exp = (bits >> 10) & 0x1F;
+    int mant = bits & 0x3FF;
+    uint32_t fbits;
+
+    if (exp == 0) {
+        if (mant == 0) {
+            fbits = ((uint32_t)sign) << 31;
+        } else {
+            /* subnormal: normalize mantissa */
+            exp = 1;
+            while ((mant & 0x400) == 0) {
+                mant <<= 1;
+                exp--;
+            }
+            mant &= 0x3FF;
+            exp = exp + (127 - 15);
+            fbits = (((uint32_t)sign) << 31) | (((uint32_t)exp) << 23) | (((uint32_t)mant) << 13);
+        }
+    } else if (exp == 0x1F) {
+        /* inf or NaN */
+        fbits = (((uint32_t)sign) << 31) | (0xFFu << 23) | (((uint32_t)mant) << 13);
+    } else {
+        exp = exp + (127 - 15);
+        fbits = (((uint32_t)sign) << 31) | (((uint32_t)exp) << 23) | (((uint32_t)mant) << 13);
+    }
+
+    union {
+        uint32_t u;
+        float f;
+    } conv = {fbits};
+    return conv.f;
+}
+
 //Raises an exception on error, which should be checked
 uint32_t getNumpyU32(PyArrayObject *obj, Py_ssize_t i) {
     int dtype;
@@ -141,7 +182,7 @@ float getNumpyF(PyArrayObject *obj, Py_ssize_t i) {
 
     switch(dtype) {
     case NPY_FLOAT16:
-        return npy_half_to_float(((npy_half*)p)[0]);
+        return dm_half_to_float(((npy_half*)p)[0]);
     case NPY_FLOAT32:
         return ((float*)p)[0];
     case NPY_FLOAT64:
@@ -200,6 +241,34 @@ int hasEntries(binaMethFile_t *bm) {
     if(bm->hdr->indexOffset != 0) return 1;  // No index, no entries pybinaMeth issue #111
     //if(bm->hdr->nBasesCovered > 0) return 1;  // Sometimes headers are broken
     return 0;
+}
+
+// Forward declarations for Python 2/3 string helpers defined later in the file.
+int PyString_Check(PyObject *obj);
+char *PyString_AsString(PyObject *obj);
+
+static uint8_t parseStrandCode(PyObject *obj) {
+    char *s = NULL;
+    if(PyString_Check(obj)) {
+        s = PyString_AsString(obj);
+        if(s && s[0] == '+') return 0;
+        if(s && s[0] == '-') return 1;
+        return 2;
+    }
+    return (uint8_t) PyLong_AsLong(obj);
+}
+
+static uint8_t parseContextCode(PyObject *obj) {
+    char *s = NULL;
+    if(PyString_Check(obj)) {
+        s = PyString_AsString(obj);
+        if(!s) return 0;
+        if(!strcmp(s, "CG")) return 1;
+        if(!strcmp(s, "CHG")) return 2;
+        if(!strcmp(s, "CHH")) return 3;
+        return 0; // Default C/ALL
+    }
+    return (uint8_t) PyLong_AsLong(obj);
 }
 
 PyObject* pyBmEnter(pybinaMethFile_t*self, PyObject *args) {
@@ -317,6 +386,49 @@ static PyObject *pyBmClose(pybinaMethFile_t *self, PyObject *args) {
 
     Py_INCREF(Py_None);
     return Py_None;
+}
+
+// Ensure the header layout bits reflect which optional columns are being
+// written. This mirrors dmtools' use of the header version bits to expose
+// coverage/strand/context/id/end availability to readers.
+static void updateLayoutFromArgs(pybinaMethFile_t *self, PyObject *coverages, PyObject *strands, PyObject *contexts, PyObject *entryid) {
+    binaMethFile_t *bm = self->bm;
+    uint16_t layout = bm->type & BM_LAYOUT_MASK;
+    int changed = 0;
+
+    if(coverages && coverages != Py_None && !(layout & BM_COVER)) {
+        layout |= BM_COVER;
+        changed = 1;
+    }
+    if(strands && strands != Py_None && !(layout & BM_STRAND)) {
+        layout |= BM_STRAND;
+        changed = 1;
+    }
+    if(contexts && contexts != Py_None && !(layout & BM_CONTEXT)) {
+        layout |= BM_CONTEXT;
+        changed = 1;
+    }
+    if(entryid && entryid != Py_None && !(layout & BM_ID)) {
+        layout |= BM_ID;
+        changed = 1;
+    }
+
+    if(!changed) return;
+
+    bm->type = layout;
+    if(bm->hdr) bm->hdr->version = layout;
+
+    // If a header has already been written, update the on-disk version field so
+    // readers discover the extra columns. The version is stored immediately
+    // after the 4-byte magic number (offset 4).
+    if(bm->isWrite && bm->hdr && bm->URL && bm->URL->type == BWG_FILE && bm->URL->x.fp) {
+        long pos = ftell(bm->URL->x.fp);
+        uint16_t version = bm->hdr->version;
+        if(fseek(bm->URL->x.fp, 4, SEEK_SET) == 0) {
+            fwrite(&version, sizeof(uint16_t), 1, bm->URL->x.fp);
+            fseek(bm->URL->x.fp, pos, SEEK_SET);
+        }
+    }
 }
 
 //Accessor for the header (version, nLevels, nBasesCovered, minVal, maxVal, sumData, sumSquared
@@ -1617,7 +1729,7 @@ int PyAddIntervals(pybinaMethFile_t *self, PyObject *chroms, PyObject *starts, P
 
         if(bm->type & BM_STRAND){
             if(PyList_Check(strands)) {
-                fstrands[i] = (uint8_t) PyLong_AsLong(PyList_GetItem(strands, i));
+                fstrands[i] = parseStrandCode(PyList_GetItem(strands, i));
     #ifdef WITHNUMPY
             } else {
                 fstrands[i] = getNumpyF((PyArrayObject*)strands, i);
@@ -1628,7 +1740,7 @@ int PyAddIntervals(pybinaMethFile_t *self, PyObject *chroms, PyObject *starts, P
 
         if(bm->type & BM_CONTEXT){
             if(PyList_Check(contexts)) {
-                fcontexts[i] = (uint8_t) PyLong_AsLong(PyList_GetItem(contexts, i));
+                fcontexts[i] = parseContextCode(PyList_GetItem(contexts, i));
     #ifdef WITHNUMPY
             } else {
                 fcontexts[i] = getNumpyF((PyArrayObject*)contexts, i);
@@ -1749,7 +1861,7 @@ int PyAppendIntervals(pybinaMethFile_t *self, PyObject *starts, PyObject *ends, 
 
         if(bm->type & BM_STRAND){
             if(PyList_Check(strands)) {
-                fstrands[i] = (uint8_t) PyLong_AsLong(PyList_GetItem(strands, i));
+                fstrands[i] = parseStrandCode(PyList_GetItem(strands, i));
     #ifdef WITHNUMPY
             } else {
                 fstrands[i] = getNumpyF((PyArrayObject*)strands, i);
@@ -1760,7 +1872,7 @@ int PyAppendIntervals(pybinaMethFile_t *self, PyObject *starts, PyObject *ends, 
 
         if(bm->type & BM_CONTEXT){
             if(PyList_Check(contexts)) {
-                fcontexts[i] = (uint8_t) PyLong_AsLong(PyList_GetItem(contexts, i));
+                fcontexts[i] = parseContextCode(PyList_GetItem(contexts, i));
     #ifdef WITHNUMPY
             } else {
                 fcontexts[i] = getNumpyF((PyArrayObject*)contexts, i);
@@ -1948,6 +2060,8 @@ PyObject *pyBmAddEntries(pybinaMethFile_t *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
+    updateLayoutFromArgs(self, coverages, strands, contexts, entryid);
+
     desiredType = getType(chroms, starts, ends, values, span, step);
     if(desiredType == -1) {
         PyErr_SetString(PyExc_RuntimeError, "You must provide a valid set of entries. These can be comprised of any of the following: \n"
@@ -1987,7 +2101,12 @@ error:
 
 static PyObject *pyIsbinaMeth(pybinaMethFile_t *self, PyObject *args) {
     binaMethFile_t *bm = self->bm;
-    if(bm->type == 0) {
+    if(!bm) {
+        PyErr_SetString(PyExc_RuntimeError, "The binaMeth file handle is not open!");
+        return NULL;
+    }
+
+    if(bm->type & BM_MAGIC) {
         Py_INCREF(Py_True);
         return Py_True;
     }
