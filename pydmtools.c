@@ -11,6 +11,47 @@
 
 int lsize = NPY_SIZEOF_LONG;
 
+static inline float dm_half_to_float(npy_half h) {
+    /*
+     * NumPy 2.0 removes the exported npy_half_to_float symbol. Perform the
+     * conversion locally using the IEEE-754 half representation to remain
+     * compatible with both NumPy 1.x and 2.x runtimes.
+     */
+    npy_uint16 bits = (npy_uint16)h;
+    int sign = bits >> 15;
+    int exp = (bits >> 10) & 0x1F;
+    int mant = bits & 0x3FF;
+    uint32_t fbits;
+
+    if (exp == 0) {
+        if (mant == 0) {
+            fbits = ((uint32_t)sign) << 31;
+        } else {
+            /* subnormal: normalize mantissa */
+            exp = 1;
+            while ((mant & 0x400) == 0) {
+                mant <<= 1;
+                exp--;
+            }
+            mant &= 0x3FF;
+            exp = exp + (127 - 15);
+            fbits = (((uint32_t)sign) << 31) | (((uint32_t)exp) << 23) | (((uint32_t)mant) << 13);
+        }
+    } else if (exp == 0x1F) {
+        /* inf or NaN */
+        fbits = (((uint32_t)sign) << 31) | (0xFFu << 23) | (((uint32_t)mant) << 13);
+    } else {
+        exp = exp + (127 - 15);
+        fbits = (((uint32_t)sign) << 31) | (((uint32_t)exp) << 23) | (((uint32_t)mant) << 13);
+    }
+
+    union {
+        uint32_t u;
+        float f;
+    } conv = {fbits};
+    return conv.f;
+}
+
 //Raises an exception on error, which should be checked
 uint32_t getNumpyU32(PyArrayObject *obj, Py_ssize_t i) {
     int dtype;
@@ -141,7 +182,7 @@ float getNumpyF(PyArrayObject *obj, Py_ssize_t i) {
 
     switch(dtype) {
     case NPY_FLOAT16:
-        return npy_half_to_float(((npy_half*)p)[0]);
+        return dm_half_to_float(((npy_half*)p)[0]);
     case NPY_FLOAT32:
         return ((float*)p)[0];
     case NPY_FLOAT64:

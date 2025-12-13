@@ -35,11 +35,13 @@ You can install this extension directly from github with:
     
     OR
     
-    pip install pydmtools==0.1.5
+    pip install pydmtools==0.1.6
 
 or with conda
 
     conda install pydmtools -c bioconda
+
+From version 0.1.6 onward, pydmtools supports Python 3.8–3.12 and works with both NumPy 1.x and 2.x.
 
 ## Requirements
 
@@ -286,7 +288,7 @@ with pydm.openfile("singlecell.dm") as dm:
 Call `dm.close()` (or rely on the context manager) after writing. Closing flushes buffered entries, writes the index, and builds zoom levels, which may take some time on large files.
 # Numpy
 
-As of version 0.1.5, pydmtools supports input of coordinates using numpy integers and vectors in some functions **if numpy was installed prior to installing pydmtools**. To determine if pydmtools was installed with numpy support by checking the `numpy` accessor:
+As of version 0.1.6, pydmtools supports input of coordinates using numpy integers and vectors in some functions **if numpy was installed prior to installing pydmtools**. To determine if pydmtools was installed with numpy support by checking the `numpy` accessor:
 
     >>> import pydmtools as pydm
     >>> pydm.numpy
